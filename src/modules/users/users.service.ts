@@ -1,26 +1,105 @@
-import { Injectable } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import * as cacheManager from 'cache-manager';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
+  constructor(
+    private prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: cacheManager.Cache,
+  ) {}
+
+  // 1. API Lấy thông tin bản thân
+  async getMe(userId: string) {
+    const cacheKey = `user:${userId}`;
+    const cachedUser = await this.cacheManager.get(cacheKey);
+    if (cachedUser) return cachedUser; // Interceptor sẽ tự bọc cái này thành { message: "Thành công", data: user }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true, displayName: true, avatarUrl: true, coverUrl: true, bio: true, birthday: true },
+    });
+
+    await this.cacheManager.set(cacheKey, user, 300000);
+    return user; 
   }
 
-  findAll() {
-    return `This action returns all users`;
+  // 2. API Cập nhật thông tin profile
+  async updateProfile(userId: string, data: any) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        displayName: data.displayName,
+        bio: data.bio,
+        birthday: data.birthday ? new Date(data.birthday) : undefined,
+      },
+    });
+
+    await this.cacheManager.del(`user:${userId}`);
+    
+    // TRẢ VỀ KIỂU NÀY: Interceptor sẽ bốc đúng message ra ngoài, còn data sẽ là null
+    return { 
+      message: 'Cập nhật thông tin profile thành công!', 
+      data: data 
+    };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  // 3. API Cập nhật Ảnh đại diện / Ảnh bìa
+  async updateImage(userId: string, imageUrl: string, type: 'avatarUrl' | 'coverUrl') {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { [type]: imageUrl },
+    });
+
+    await this.cacheManager.del(`user:${userId}`);
+    
+    // TRẢ VỀ KIỂU NÀY: Dữ liệu trả về cực kỳ bóc tách và mạch lạc
+    return { 
+      message: `Cập nhật ${type === 'avatarUrl' ? 'ảnh đại diện' : 'ảnh bìa'} thành công!`, 
+      data: { url: imageUrl } 
+    };
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
+  // API cho quản trị
+  async getAllUsers() {
+    const users = await this.prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        avatarUrl: true,
+        role: true, // Lấy thêm role để Admin dễ quản lý
+        createdAt: true,
+      },
+      orderBy: {
+        createdAt: 'desc', // Sắp xếp user mới nhất lên đầu
+      }
+    });
+
+    return {
+      message: 'Lấy danh sách người dùng thành công',
+      data: users,
+    };
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  async deleteUser(id: string) {
+    // Kiểm tra xem user có tồn tại không
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng này');
+    }
+
+    // Thực hiện xóa
+    await this.prisma.user.delete({
+      where: { id },
+    });
+
+    return {
+      message: `Đã xóa thành công người dùng có ID: ${id}`,
+    };
   }
 }
