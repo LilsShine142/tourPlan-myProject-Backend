@@ -22,6 +22,15 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @Post('logout')
+  @ApiBearerAuth()            // Hiện ổ khóa bảo mật trên Swagger
+  @UseGuards(JwtAuthGuard)    // Bật khiên Guard để bóc tách Token lấy thông tin user
+  @ApiOperation({ summary: 'Đăng xuất khỏi hệ thống và xóa sạch cache Redis' })
+  async logout(@CurrentUser() user: any) {
+    // user.id lấy từ request.user do JwtStrategy nạp vào ban nãy
+    return await this.authService.logout(user.id);
+  }
+
   // --- TEST GUARD VÀ DECORATOR MỚI TẠO ---
   @Get('me')
   @ApiBearerAuth() // Hiện nút ổ khoá trên Swagger
