@@ -14,7 +14,7 @@ export class UsersService {
 
   // 1. API Lấy thông tin bản thân
   async getMe(userId: string) {
-    const cacheKey = `user:${userId}`;
+    const cacheKey = `profile:${userId}`;
     const cachedUser = await this.cacheManager.get(cacheKey);
     if (cachedUser) return cachedUser; // Interceptor sẽ tự bọc cái này thành { message: "Thành công", data: user }
 
@@ -23,7 +23,8 @@ export class UsersService {
       select: { id: true, email: true, role: true, displayName: true, avatarUrl: true, coverUrl: true, bio: true, birthday: true },
     });
 
-    await this.cacheManager.set(cacheKey, user, 300000);
+    const redisProfileTtlMs = Number(process.env.REDIS_PROFILE_TTL_MS || '300000');
+    await this.cacheManager.set(cacheKey, user, redisProfileTtlMs);
     return user; 
   }
 
@@ -38,7 +39,7 @@ export class UsersService {
       },
     });
 
-    await this.cacheManager.del(`user:${userId}`);
+    await this.cacheManager.del(`profile:${userId}`);
     
     // TRẢ VỀ KIỂU NÀY: Interceptor sẽ bốc đúng message ra ngoài, còn data sẽ là null
     return { 
@@ -54,7 +55,7 @@ export class UsersService {
       data: { [type]: imageUrl },
     });
 
-    await this.cacheManager.del(`user:${userId}`);
+    await this.cacheManager.del(`profile:${userId}`);
     
     // TRẢ VỀ KIỂU NÀY: Dữ liệu trả về cực kỳ bóc tách và mạch lạc
     return { 

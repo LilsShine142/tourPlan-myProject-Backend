@@ -121,6 +121,32 @@ enum FeedbackType {
   other
 }
 
+enum BookingStatus {
+  PENDING // Đang chờ thanh toán
+  CONFIRMED // Đã thanh toán, giữ chỗ thành công
+  CANCELLED // Đã hủy (do khách hoặc do quá hạn thanh toán)
+  COMPLETED // Đã đi tour xong
+}
+
+enum BookingPaymentStatus {
+  UNPAID // Chưa thanh toán
+  PAID // Đã thanh toán
+  REFUNDED // Đã hoàn tiền (khi khách hủy tour)
+  FAILED // Giao dịch lỗi
+}
+
+enum PaymentMethod {
+  VNPAY
+  MOMO
+  BANK_TRANSFER // Chuyển khoản thủ công
+}
+
+enum TicketStatus {
+  VALID // Vé hợp lệ, chưa sử dụng
+  USED // Đã quét QR code / Đã check-in
+  CANCELLED // Vé bị hủy
+}
+
 // ==========================================
 // MODELS
 // ==========================================
@@ -156,6 +182,7 @@ model User {
   tripMemberships  TripMember[]
   notifications    Notification[]
   feedbacks        Feedback[]
+  bookings         Booking[]
 }
 
 model Role {
@@ -313,6 +340,17 @@ model Trip {
   creator      User          @relation("TripCreator", fields: [createdBy], references: [id])
   members      TripMember[]
   destinations Destination[]
+
+  // 🚀 CÁC TRƯỜNG BỔ SUNG CHO TÍNH NĂNG BÁN TOUR
+  isCommercial        Boolean   @default(false) // Đánh dấu đây là tour thương mại để bán
+  price               Float? // Giá vé người lớn
+  childPrice          Float? // Giá vé trẻ em
+  maxCapacity         Int? // Tổng số lượng chỗ (Slots) tối đa bán ra
+  currentParticipants Int       @default(0) // Số chỗ đã có người đặt (Dùng để tính Slot còn lại)
+  bookingDeadline     DateTime? // Hạn chót nhận đặt chỗ
+  termsAndConditions  String? // Điều khoản, chính sách hoàn hủy
+  // Quan hệ mới
+  bookings            Booking[] // Một chuyến đi có nhiều đơn đặt chỗ
 }
 
 model TripMember {
@@ -385,4 +423,72 @@ model Feedback {
   updatedAt  DateTime     @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// THƯƠNG MẠI ĐIỆN TỬ & ĐẶT TOUR (BOOKING)
+// ==========================================
+
+model Booking {
+  id          String   @id @default(uuid())
+  tripId      String
+  userId      String? // Người thực hiện đặt tour (giữ lịch sử ngay cả khi user bị xóa)
+  bookingDate DateTime @default(now())
+
+  // Thông tin số lượng & giá tiền
+  adultCount Int   @default(1)
+  childCount Int   @default(0)
+  totalPrice Float // Tổng tiền phải thanh toán
+
+  // Trạng thái đơn hàng
+  status        BookingStatus        @default(PENDING)
+  paymentStatus BookingPaymentStatus @default(UNPAID)
+  paymentMethod PaymentMethod?
+
+  // Thông tin liên hệ của người đặt (Có thể lấy từ User hoặc nhập tay khi đặt)
+  contactName     String
+  contactPhone    String
+  contactEmail    String
+  specialRequests String? // Ghi chú của khách (Ví dụ: Dị ứng hải sản)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Mối quan hệ
+  trip         Trip                 @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user         User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  transactions BookingTransaction[]
+  tickets      Ticket[]
+}
+
+// Bảng lưu vết giao dịch qua cổng thanh toán (Bắt buộc phải có để đối soát với VNPAY/Momo)
+model BookingTransaction {
+  id                   String               @id @default(uuid())
+  bookingId            String
+  amount               Float // Số tiền giao dịch
+  gateway              PaymentMethod // VNPAY, MOMO
+  gatewayTransactionId String? // Mã giao dịch trả về từ VNPAY/Momo (Rất quan trọng)
+  status               BookingPaymentStatus // Trạng thái của lần thanh toán này
+  errorMessage         String? // Ghi nhận lý do lỗi nếu FAILED
+  createdAt            DateTime             @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+// Bảng Vé điện tử (Xuất ra sau khi thanh toán thành công)
+model Ticket {
+  id         String       @id @default(uuid())
+  bookingId  String
+  ticketCode String       @unique // Mã Code tạo ngẫu nhiên (Ví dụ: TOUR-VN83K2). Dùng để gen QR Code
+  qrCodeUrl  String? // Link ảnh QR Code lưu trên Cloudinary
+  status     TicketStatus @default(VALID)
+
+  // Thông tin hành khách (Có thể là người đặt hoặc bạn bè của người đặt)
+  passengerName String
+  passengerType String // ADULT (Người lớn) hoặc CHILD (Trẻ em)
+
+  issuedAt DateTime  @default(now())
+  usedAt   DateTime? // Thời điểm hướng dẫn viên quét QR Code check-in
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 }

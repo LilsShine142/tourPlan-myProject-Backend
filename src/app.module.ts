@@ -12,16 +12,19 @@ import { TripsModule } from './modules/trips/trips.module';
 import { BillsModule } from './modules/bills/bills.module';
 import { GroupsModule } from './modules/groups/groups.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { ExploreModule } from './modules/explore/explore.module';
 
 @Module({
   imports: [
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => {
+        const redisDefaultTtlMs = Number(process.env.REDIS_DEFAULT_TTL_MS || '3600000');
+
         // 1. Khởi tạo và await Redis Store riêng ở bên ngoài
         const store = await redisStore({
           url: process.env.REDIS_URL || 'redis://localhost:6379',
-          ttl: 60 * 60 * 1000, // 60 phút
+          ttl: redisDefaultTtlMs,
         });
 
         // 2. Trả về cấu hình dạng hàm () => store để vừa lòng cache-manager v5
@@ -39,6 +42,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     GroupsModule,
     BillsModule,
     PaymentsModule,
+    ExploreModule,
   ],
   controllers: [AppController],
   providers: [AppService],
