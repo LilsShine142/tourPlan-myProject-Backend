@@ -1,26 +1,35 @@
-import { Injectable } from '@nestjs/common';
-import { CreateDestinationDto } from './dto/create-destination.dto';
-import { UpdateDestinationDto } from './dto/update-destination.dto';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CreateDestinationDto, CreatePlaceItemDto } from './dto/create-destination.dto';
 
 @Injectable()
 export class DestinationsService {
-  create(createDestinationDto: CreateDestinationDto) {
-    return 'This action adds a new destination';
+  constructor(private prisma: PrismaService) {}
+
+  // --- DESTINATIONS ---
+  async createDestination(dto: CreateDestinationDto) {
+    return await this.prisma.destination.create({ data: dto });
   }
 
-  findAll() {
-    return `This action returns all destinations`;
+  async deleteDestination(id: string) {
+    return await this.prisma.destination.delete({ where: { id } });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} destination`;
+  // --- PLACE ITEMS ---
+  async addPlaceToDestination(destinationId: string, dto: CreatePlaceItemDto) {
+    // Xác nhận chặng tồn tại
+    const dest = await this.prisma.destination.findUnique({ where: { id: destinationId } });
+    if (!dest) throw new NotFoundException('Không tìm thấy chặng đi này');
+
+    return await this.prisma.placeItem.create({
+      data: {
+        ...dto,
+        destinationId,
+      },
+    });
   }
 
-  update(id: number, updateDestinationDto: UpdateDestinationDto) {
-    return `This action updates a #${id} destination`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} destination`;
+  async deletePlace(placeId: string) {
+    return await this.prisma.placeItem.delete({ where: { id: placeId } });
   }
 }
