@@ -55,10 +55,11 @@ export class AuthService {
 
     if (fullUser) {
       const { password, ...userWithoutPassword } = fullUser;
+      const redisSessionTtlMs = Number(process.env.REDIS_SESSION_TTL_MS || '86400000');
       
       // Lưu vào Redis với key dạng 'user:uuid-cua-user'
-      // TTL tính bằng mili-giây: 1 ngày = 86400000
-      await this.cacheManager.set(`user:${user.id}`, userWithoutPassword, 86400000);
+      // TTL tính bằng mili-giây, lấy từ env để dễ chỉnh
+      await this.cacheManager.set(`user:${user.id}`, userWithoutPassword, redisSessionTtlMs);
     }
     return {
       message: 'Đăng nhập thành công',
@@ -70,11 +71,9 @@ export class AuthService {
   }
 
   async logout(userId: string) {
-    // 1. Định dạng đúng Key của user cần xóa cache (khớp với lúc login)
-    const cacheKey = `user:${userId}`;
-
-    // 2. Chọc vào Redis và xóa Key này đi
-    await this.cacheManager.del(cacheKey);
+    // Xóa cả session login và cache profile để tránh dữ liệu cũ
+    await this.cacheManager.del(`user:${userId}`);
+    await this.cacheManager.del(`profile:${userId}`);
 
     // 3. Trả về thông báo thành công cho Frontend
     return {

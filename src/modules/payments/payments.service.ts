@@ -12,6 +12,35 @@ export class PaymentsService {
     if (dto.payerId === dto.receiverId) {
       throw new BadRequestException('Bạn không thể tự thanh toán cho chính mình');
     }
+
+    const group = await this.prisma.group.findUnique({
+      where: { id: dto.groupId },
+      select: { id: true },
+    });
+
+    if (!group) {
+      throw new BadRequestException('Nhóm chi tiêu không tồn tại hoặc groupId không hợp lệ');
+    }
+
+    const [payerMember, receiverMember] = await this.prisma.$transaction([
+      this.prisma.groupMember.findFirst({
+        where: { id: dto.payerId, groupId: dto.groupId },
+        select: { id: true, name: true },
+      }),
+      this.prisma.groupMember.findFirst({
+        where: { id: dto.receiverId, groupId: dto.groupId },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    if (!payerMember) {
+      throw new BadRequestException('payerId không thuộc nhóm chi tiêu này');
+    }
+
+    if (!receiverMember) {
+      throw new BadRequestException('receiverId không thuộc nhóm chi tiêu này');
+    }
+
     return await this.prisma.payment.create({
       data: { ...dto, status: PaymentStatus.pending },
     });
