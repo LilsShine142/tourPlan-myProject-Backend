@@ -7,6 +7,11 @@ import { UsersModule } from './modules/users/users.module';
 import { UploadModule } from './common/upload/upload.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { DestinationsModule } from './modules/destinations/destinations.module';
+import { TripsModule } from './modules/trips/trips.module';
+import { BillsModule } from './modules/bills/bills.module';
+import { GroupsModule } from './modules/groups/groups.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
   imports: [
@@ -29,6 +34,11 @@ import { AppService } from './app.service';
     AuthModule,
     UsersModule,
     UploadModule,
+    TripsModule,       
+    DestinationsModule, 
+    GroupsModule,
+    BillsModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, UseGuards, UseInterceptors, UploadedFile, Delete, Param } from '@nestjs/common';
+import { Controller, Get, Patch, Body, UseGuards, UseInterceptors, UploadedFile, Delete, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UploadService } from '../../common/upload/upload.service';
@@ -9,6 +9,7 @@ import 'multer';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
+import { GetUsersQueryDto } from './dto/get-users-query.dto';
 
 @ApiTags('Users') // Tên nhóm hiển thị trên Swagger (để "Users" cho ngắn gọn giống Auth)
 @ApiBearerAuth()  // Hiển thị biểu tượng cái khóa yêu cầu Token
@@ -80,8 +81,9 @@ export class UsersController {
   @Roles(Role.ADMIN) // Chỉ Admin mới được phép truy cập API này  
   @ApiOperation({ summary: 'Lấy danh sách tất cả người dùng (Dành cho Admin)' })
   @ApiResponse({ status: 200, description: 'Lấy danh sách thành công.' })
-  getAllUsers() {
-    return this.usersService.getAllUsers();
+  getAllUsers(@Query() query: GetUsersQueryDto) {
+    const result = this.usersService.getAllUsers(query);
+    return result;
   }
 
   @Delete(':id')

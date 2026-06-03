@@ -57,8 +57,8 @@ export class AuthService {
       const { password, ...userWithoutPassword } = fullUser;
       
       // Lưu vào Redis với key dạng 'user:uuid-cua-user'
-      // TTL: 86400 giây (1 ngày) - Lưu ý: Nếu dùng cache-manager v5, TTL tính bằng miligiây (86400000)
-      await this.cacheManager.set(`user:${user.id}`, userWithoutPassword, 86400);
+      // TTL tính bằng mili-giây: 1 ngày = 86400000
+      await this.cacheManager.set(`user:${user.id}`, userWithoutPassword, 86400000);
     }
     return {
       message: 'Đăng nhập thành công',
