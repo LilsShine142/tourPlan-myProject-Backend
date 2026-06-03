@@ -2,6 +2,8 @@ import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import * as cacheManager from 'cache-manager';
 import { PrismaService } from '../../prisma/prisma.service';
+import { GetUsersQueryDto } from './dto/get-users-query.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -62,24 +64,40 @@ export class UsersService {
   }
 
   // API cho quản trị
-  async getAllUsers() {
-    const users = await this.prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        avatarUrl: true,
-        role: true, // Lấy thêm role để Admin dễ quản lý
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc', // Sắp xếp user mới nhất lên đầu
-      }
-    });
+  async getAllUsers(query: GetUsersQueryDto) {
+    const { limit = 10, offset = 0, search, role } = query;
+
+    const where: Prisma.UserWhereInput = {};
+    if (role) where.role = { is: { name: role } };
+    if (search) {
+      where.OR = [
+        { displayName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, users] = await this.prisma.$transaction([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          avatarUrl: true,
+          role: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+    ]);
 
     return {
-      message: 'Lấy danh sách người dùng thành công',
+      object: 'list',
       data: users,
+      pagination: { total, limit, offset },
     };
   }
 

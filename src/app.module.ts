@@ -7,6 +7,8 @@ import { UsersModule } from './modules/users/users.module';
 import { UploadModule } from './common/upload/upload.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { DestinationsModule } from './modules/destinations/destinations.module';
+import { TripsModule } from './modules/trips/trips.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { AppService } from './app.service';
     AuthModule,
     UsersModule,
     UploadModule,
+    TripsModule,       
+    DestinationsModule, 
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,10 +1,11 @@
-import { Controller, Post, Get, Body, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Query, Delete, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { TripsService } from './trips.service';
 import { CreateTripDto } from './dto/create-trip.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { GetTripsQueryDto } from './dto/get-trips-query.dto';
 
 @ApiTags('Trips')
 @ApiBearerAuth()
@@ -22,11 +23,17 @@ export class TripsController {
   }
 
   @Get('my-trips')
-  @ApiOperation({ summary: 'Lấy danh sách chuyến đi của tôi' })
-  @ApiResponse({ status: 200, description: 'Lấy dữ liệu thành công.' })
-  async getMyTrips(@CurrentUser() user: any) {
-    const data = await this.tripsService.getMyTrips(user.id);
-    return { message: 'Lấy danh sách chuyến đi thành công', data };
+  @ApiOperation({ summary: 'Lấy danh sách chuyến đi của tôi (Hỗ trợ phân trang, tìm kiếm và lọc)' })
+  @ApiResponse({ status: 200, description: 'Lấy danh sách thành công kèm metadata phân trang.' })
+  async getMyTrips(
+    @CurrentUser() user: any, 
+    @Query() query: GetTripsQueryDto 
+  ) {
+    const result = await this.tripsService.getMyTrips(user.id, query);
+    return { 
+      message: 'Lấy danh sách chuyến đi thành công', 
+      ...result 
+    };
   }
 
   @Get(':id')

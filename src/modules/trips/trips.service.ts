@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTripDto } from './dto/create-trip.dto';
+import { GetTripsQueryDto } from './dto/get-trips-query.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class TripsService {
@@ -28,16 +30,58 @@ export class TripsService {
     });
   }
 
-  async getMyTrips(userId: string) {
-    // Lấy tất cả các chuyến đi mà user này là thành viên
-    return await this.prisma.trip.findMany({
-      where: {
-        members: {
-          some: { userId: userId },
-        },
+  async getMyTrips(userId: string, query: GetTripsQueryDto) {
+    const { limit, offset, search, status } = query;
+
+    // 1. Xây dựng điều kiện lọc (Bắt buộc user phải là thành viên chuyến đi)
+    const whereCondition: Prisma.TripWhereInput = {
+      members: {
+        some: { userId: userId },
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    };
+
+    // Lọc theo trạng thái nếu có
+    if (status) {
+      whereCondition.status = status;
+    }
+
+    // Lọc theo từ khóa search (Không phân biệt hoa thường nhờ mode: 'insensitive')
+    if (search) {
+      whereCondition.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // 2. Chạy song song 2 câu lệnh: Đếm tổng số và Lấy data phân trang (Tối ưu performance)
+    const [total, trips] = await this.prisma.$transaction([
+      this.prisma.trip.count({ where: whereCondition }),
+      this.prisma.trip.findMany({
+        where: whereCondition,
+        take: limit,  // Số lượng lấy
+        skip: offset, // Số lượng bỏ qua
+        orderBy: { createdAt: 'desc' },
+        include: {
+          // Trả thêm thông tin rút gọn của thành viên để hiển thị avatar ngoài danh sách
+          members: {
+            include: {
+              user: { select: { displayName: true, avatarUrl: true } }
+            }
+          }
+        }
+      }),
+    ]);
+
+    // 3. Trả về cấu trúc phân trang chuẩn chỉnh
+    return {
+      object: 'list',
+      data: trips,
+      pagination: {
+        total,
+        limit,
+        offset,
+      }
+    };
   }
 
   async getTripDetails(tripId: string) {
