@@ -31,7 +31,10 @@ export class TripsService {
   }
 
   async getMyTrips(userId: string, query: GetTripsQueryDto) {
-    const { limit, offset, search, status } = query;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const { search, status } = query;
+    const skip = (page - 1) * limit;
 
     // 1. Xây dựng điều kiện lọc (Bắt buộc user phải là thành viên chuyến đi)
     const whereCondition: Prisma.TripWhereInput = {
@@ -59,7 +62,7 @@ export class TripsService {
       this.prisma.trip.findMany({
         where: whereCondition,
         take: limit,  // Số lượng lấy
-        skip: offset, // Số lượng bỏ qua
+        skip, // Vị trí bắt đầu lấy
         orderBy: { createdAt: 'desc' },
         include: {
           // Trả thêm thông tin rút gọn của thành viên để hiển thị avatar ngoài danh sách
@@ -79,7 +82,8 @@ export class TripsService {
       pagination: {
         total,
         limit,
-        offset,
+        page,
+        totalPages: Math.ceil(total / limit),
       }
     };
   }

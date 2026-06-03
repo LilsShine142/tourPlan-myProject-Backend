@@ -12,12 +12,12 @@ export class GetTripsQueryDto {
   @Max(100)
   limit?: number = 10;
 
-  @ApiPropertyOptional({ description: 'Số lượng bản ghi bỏ qua (Vị trí bắt đầu lấy)', default: 0, example: 0 })
+  @ApiPropertyOptional({ description: 'Số trang hiện tại', default: 1, example: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(0)
-  offset?: number = 0;
+  @Min(1)
+  page?: number = 1;
 
   @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm theo Tiêu đề hoặc Mô tả', example: 'Đà Lạt' })
   @IsOptional()

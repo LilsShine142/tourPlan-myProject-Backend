@@ -1,26 +1,57 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
-import { UpdatePaymentDto } from './dto/update-payment.dto';
+import { PaymentStatus } from '@prisma/client';
 
 @Injectable()
 export class PaymentsService {
-  create(createPaymentDto: CreatePaymentDto) {
-    return 'This action adds a new payment';
+  constructor(private prisma: PrismaService) {}
+
+  // 1. Tạo yêu cầu thanh toán
+  async createPayment(dto: CreatePaymentDto) {
+    if (dto.payerId === dto.receiverId) {
+      throw new BadRequestException('Bạn không thể tự thanh toán cho chính mình');
+    }
+    return await this.prisma.payment.create({
+      data: { ...dto, status: PaymentStatus.pending },
+    });
   }
 
-  findAll() {
-    return `This action returns all payments`;
+  // 2. Lấy danh sách thông báo cần xử lý của chủ nợ
+  async getPendingRequests(currentUserId: string) {
+    return await this.prisma.payment.findMany({
+      where: {
+        status: 'pending',
+        // Tìm những giao dịch mà Người nhận có liên kết tới tài khoản của User đang login
+        group: {
+          members: {
+            some: { userId: currentUserId, role: { in: ['admin', 'member'] } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} payment`;
-  }
+  // 3. Xử lý Duyệt hoặc Từ chối giao dịch thanh toán
+  async handleReviewPayment(paymentId: string, currentUserId: string, action: 'approve' | 'reject') {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { group: { include: { members: true } } }
+    });
 
-  update(id: number, updatePaymentDto: UpdatePaymentDto) {
-    return `This action updates a #${id} payment`;
-  }
+    if (!payment) throw new NotFoundException('Không tìm thấy bản ghi giao dịch này');
+    if (payment.status !== 'pending') throw new BadRequestException('Giao dịch này đã được xử lý rồi');
 
-  remove(id: number) {
-    return `This action removes a #${id} payment`;
+    // Bảo mật: Tìm xem trong Group đó, GroupMember gánh vai trò receiverId có đúng là của User đang đăng nhập không
+    const targetReceiverMember = payment.group.members.find(m => m.id === payment.receiverId);
+    if (!targetReceiverMember || targetReceiverMember.userId !== currentUserId) {
+      throw new BadRequestException('Bạn không phải là chủ nợ thực sự của bill này để có quyền phê duyệt!');
+    }
+
+    return await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: { status: action === 'approve' ? PaymentStatus.confirmed : PaymentStatus.cancelled },
+    });
   }
 }

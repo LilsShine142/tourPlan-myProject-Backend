@@ -65,7 +65,10 @@ export class UsersService {
 
   // API cho quản trị
   async getAllUsers(query: GetUsersQueryDto) {
-    const { limit = 10, offset = 0, search, role } = query;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const { search, role } = query;
+    const skip = (page - 1) * limit;
 
     const where: Prisma.UserWhereInput = {};
     if (role) where.role = { is: { name: role } };
@@ -90,14 +93,14 @@ export class UsersService {
         },
         orderBy: { createdAt: 'desc' },
         take: limit,
-        skip: offset,
+        skip,
       }),
     ]);
 
     return {
       object: 'list',
       data: users,
-      pagination: { total, limit, offset },
+      pagination: { total, limit, page, totalPages: Math.ceil(total / limit) },
     };
   }
 

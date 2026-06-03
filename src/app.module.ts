@@ -9,6 +9,9 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DestinationsModule } from './modules/destinations/destinations.module';
 import { TripsModule } from './modules/trips/trips.module';
+import { BillsModule } from './modules/bills/bills.module';
+import { GroupsModule } from './modules/groups/groups.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
   imports: [
@@ -33,6 +36,9 @@ import { TripsModule } from './modules/trips/trips.module';
     UploadModule,
     TripsModule,       
     DestinationsModule, 
+    GroupsModule,
+    BillsModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
